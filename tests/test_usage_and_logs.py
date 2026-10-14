@@ -18,7 +18,7 @@ PERIOD = {"from": "2026-09-01", "to": "2026-09-30"}
 def test_usage_proxies_period(client, fake):
     r = client.get("/usage", params=PERIOD, headers={"Authorization": f"Bearer {PLATFORM_KEY}"})
     assert r.status_code == 200
-    assert r.json() == {"from": "2026-09-01", "to": "2026-09-30", "items": []}
+    assert r.json() == {"from": "2026-09-01", "to": "2026-09-30", "tenants": []}
     assert fake.paths() == [("GET", "/v1/partner/usage", PERIOD)]
 
 

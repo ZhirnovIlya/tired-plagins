@@ -1,7 +1,7 @@
 import time
 
 import pytest
-from conftest import event, send, signed
+from conftest import event, ext, send, signed
 
 T = "/v1/partner/tenants"
 
@@ -9,7 +9,7 @@ T = "/v1/partner/tenants"
 def test_purchase_creates_tenant_with_plugin_plan(client, fake):
     r = send(client, event("e1", "subscription.purchased"))
     assert r.status_code == 200 and r.json() == {"status": "processed"}
-    assert fake.paths() == [("POST", T, {"external_account_id": "acc-1", "plan": "plugin"})]
+    assert fake.paths() == [("POST", T, {"external_account_id": ext("acc-1"), "plan": "plugin"})]
 
 
 def test_wrong_signature_is_rejected_without_calls(client, fake):
@@ -72,7 +72,7 @@ def test_renewal_after_cancel_reactivates(client, fake):
     fake.paths()
     assert send(client, event("e2", "subscription.renewed")).status_code == 200
     assert fake.paths() == [
-        ("POST", T, {"external_account_id": "acc-1", "plan": "plugin"}),
+        ("POST", T, {"external_account_id": ext("acc-1"), "plan": "plugin"}),
         ("PATCH", f"{T}/t-1", {"status": "active"}),
     ]
     assert fake.tenants["t-1"]["status"] == "active"
@@ -112,4 +112,18 @@ def test_bbmarket_adapter_is_used(make_client, fake):
         "created_at": "2026-10-14T10:00:00Z",
     }
     assert send(client, body).status_code == 200
-    assert fake.paths() == [("POST", T, {"external_account_id": "c-9", "plan": "plugin_pro"})]
+    assert fake.paths() == [
+        ("POST", T, {"external_account_id": ext("c-9", "bbmarket"), "plan": "plugin_pro"})
+    ]
+
+
+def test_repurchase_with_other_tariff_patches_plan(client, fake):
+    """Повторный POST тариф не меняет (контракт TIREK) — меняет PATCH."""
+    _purchased(client, fake)
+    send(client, event("e1", "subscription.cancelled", at="2026-10-14T09:30:00Z"))
+    fake.paths()
+    assert send(client, event("e2", "subscription.purchased", plan="pro")).status_code == 200
+    assert fake.paths() == [
+        ("POST", T, {"external_account_id": ext("acc-1"), "plan": "plugin_pro"}),
+        ("PATCH", f"{T}/t-1", {"plan": "plugin_pro", "status": "active"}),
+    ]

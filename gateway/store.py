@@ -68,3 +68,8 @@ class Store:
                    last_event_at = COALESCE(excluded.last_event_at, accounts.last_event_at)""",
                 (account_id, tenant_id, at.astimezone(UTC).isoformat() if at else None),
             )
+
+    def accounts_by_tenant(self) -> dict[str, str]:
+        """tenant_id → номер аккаунта площадки (для учёта)."""
+        with self._db() as db:
+            return dict(db.execute("SELECT tenant_id, account_id FROM accounts").fetchall())

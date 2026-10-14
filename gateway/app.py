@@ -80,10 +80,15 @@ def create_app(
         if last and ev.occurred_at < last:
             return "stale"  # вебхуки приходят не по порядку: старое не отменяет новое
         if ev.type in (EventType.purchased, EventType.renewed):
-            t = await tirek.ensure_tenant(ev.account_id, settings.plan_map.get(ev.plan, PLUGIN))
+            plan = settings.plan_map.get(ev.plan, PLUGIN)
+            t = await tirek.ensure_tenant(ev.account_id, plan)
             tenant_id = t["tenant_id"]
+            # повторный POST тариф не меняет (контракт TIREK) — тариф из события ставит PATCH
+            changes = {"plan": plan} if ev.plan in settings.plan_map and t["plan"] != plan else {}
             if t["status"] != "active":
-                await tirek.patch_tenant(tenant_id, status="active")
+                changes["status"] = "active"
+            if changes:
+                await tirek.patch_tenant(tenant_id, **changes)
         else:
             if ev.type is EventType.plan_changed:
                 if ev.plan not in settings.plan_map:
@@ -178,10 +183,15 @@ def create_app(
             log.warning("учёт: неверный ключ площадки")
             return JSONResponse({"detail": "invalid key"}, 401)
         try:
-            return await tirek.usage(from_, to)
+            data = await tirek.usage(from_, to)
         except httpx.HTTPError as e:
             log.error("учёт: API TIREK не ответило (%s)", type(e).__name__)
             return JSONResponse({"detail": "upstream error"}, 502)
+        # в TIREK лежит хэш номера, площадке — её собственный номер аккаунта
+        accounts = store.accounts_by_tenant()
+        for t in data.get("tenants", []):
+            t["external_account_id"] = accounts.get(t["tenant_id"])
+        return data
 
     @app.get("/healthz")
     async def healthz():

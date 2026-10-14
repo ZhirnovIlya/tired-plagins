@@ -1,7 +1,7 @@
 import time
 
 import pytest
-from conftest import CABINET, event, send, token
+from conftest import CABINET, event, ext, send, token
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
@@ -14,8 +14,8 @@ def test_valid_token_new_account_creates_tenant_and_redirects(client, fake):
     assert r.status_code == 303
     assert r.headers["location"] == f"{CABINET}/#/login?code=code-1"
     assert fake.paths() == [
-        ("POST", T, {"external_account_id": "acc-1", "plan": "plugin"}),
-        ("POST", CODES, {"tenant_id": "t-1", "external_user_id": "user-7"}),
+        ("POST", T, {"external_account_id": ext("acc-1"), "plan": "plugin"}),
+        ("POST", CODES, {"tenant_id": "t-1", "external_user_id": ext("user-7")}),
     ]
 
 
@@ -24,7 +24,9 @@ def test_known_account_goes_straight_to_login_code(client, fake):
     fake.paths()
     r = client.get("/sso", params={"token": token()})
     assert r.status_code == 303
-    assert fake.paths() == [("POST", CODES, {"tenant_id": "t-1", "external_user_id": "user-7"})]
+    assert fake.paths() == [
+        ("POST", CODES, {"tenant_id": "t-1", "external_user_id": ext("user-7")})
+    ]
 
 
 now = int(time.time())

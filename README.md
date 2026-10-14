@@ -34,21 +34,28 @@
 
 ## Контракт с TIREK
 
-Реализуется в основном продукте (ветка `feat/partner-plans`). Все запросы — с заголовком
-`Authorization: Bearer <TIREK_PARTNER_KEY>`.
+Источник — `docs/PARTNER_API.md` основного продукта (ветка `feat/partner-plans`). Все запросы —
+с заголовком `Authorization: Bearer <TIREK_PARTNER_KEY>`; ошибки — `{"detail": {"code", "message"}}`.
+
+**Номера площадки в TIREK не уходят.** Вместо номера аккаунта и пользователя шлюз передаёт
+`sha256("<PLATFORM>:<номер>")`, первые 32 символа hex (строчные). Хэш детерминированный —
+создание арендатора остаётся идемпотентным; TIREK отклоняет номера, похожие на ПДн
+(11–12 цифр, e-mail), а такой хэш принимает. Поэтому `PLATFORM` после запуска не меняют:
+иначе у тех же аккаунтов будут новые хэши и новые арендаторы. Соответствие номер площадки →
+арендатор хранится в SQLite шлюза.
 
 | Запрос | Тело / параметры | Ответ |
 |---|---|---|
-| `POST /v1/partner/tenants` | `{external_account_id, plan}` | `{tenant_id, status}`; идемпотентно по `external_account_id` |
-| `PATCH /v1/partner/tenants/{tenant_id}` | `{plan?, status?: active\|frozen\|cancelled}` | — |
-| `POST /v1/partner/login-codes` | `{tenant_id, external_user_id}` | `{code, expires_in}`; для неактивного арендатора шлюз ждёт 403/404/409 |
-| `GET /v1/partner/usage` | `?from=&to=` | отдаётся площадке как есть |
+| `POST /v1/partner/tenants` | `{external_account_id: хэш, plan}` | 201 новый / 200 повтор: `{tenant_id, plan, status}`; повтор тариф не меняет |
+| `PATCH /v1/partner/tenants/{tenant_id}` | `{plan?, status?: active\|frozen\|cancelled}` | 200 `{tenant_id, plan, status}`; 404 `tenant/not-found` |
+| `POST /v1/partner/login-codes` | `{tenant_id, external_user_id: хэш}` | 201 `{code, expires_in}`; 403 `tenant/frozen`, 404 `tenant/not-found` → «Подписка не активна» |
+| `GET /v1/partner/usage` | `?from=&to=` | `{from, to, tenants: [{tenant_id, plan, status, external_account_id, projects, runs}]}` — шлюз заменяет хэш в `external_account_id` на номер аккаунта площадки |
 
 Кабинет принимает `#/login?code=…`.
 
 | Событие площадки | Вызов TIREK |
 |---|---|
-| покупка, продление | `POST tenants` (тариф по `PLAN_MAP`, иначе `plugin`); если арендатор не активен — `PATCH status=active` |
+| покупка, продление | `POST tenants` (тариф по `PLAN_MAP`, иначе `plugin`); если арендатор уже был — `PATCH` статуса `active` и тарифа из события, когда они отличаются |
 | смена тарифа | `PATCH plan` (по `PLAN_MAP`) |
 | отмена, возврат | `PATCH status=frozen` |
 
@@ -94,7 +101,7 @@ docker compose up -d --build
 
 ## Логи и данные
 
-В логах и в SQLite — только id событий, аккаунтов (компаний) и арендаторов. Ключи, секреты,
+В логах и в SQLite — только id событий, аккаунтов (компаний) и арендаторов; в TIREK — только хэши номеров. Ключи, секреты,
 токены, коды входа и id пользователей не пишутся (тест `tests/test_usage_and_logs.py`).
 Персональные данные шлюзу не нужны и не принимаются.
 
