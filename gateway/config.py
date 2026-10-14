@@ -3,10 +3,13 @@
 from typing import Literal
 
 from pydantic import SecretStr, model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # пустая переменная (например, ${X} без значения в compose) = не задана
+    model_config = SettingsConfigDict(env_ignore_empty=True)
+
     # Формат событий и токенов площадки: neutral — наша схема (docs/), bbmarket — адаптер.
     platform: Literal["neutral", "bbmarket"] = "neutral"
 

@@ -1,0 +1,27 @@
+# Пример. Значения переменных — в файле .env рядом (в git не попадает) или в окружении сервера.
+# Здесь только имена; описание каждой — в README.
+services:
+  gateway:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"  # наружу — через обратный прокси с TLS
+    environment:
+      PLATFORM: ${PLATFORM}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      WEBHOOK_TOLERANCE_SECONDS: ${WEBHOOK_TOLERANCE_SECONDS}
+      SSO_JWT_ALGORITHM: ${SSO_JWT_ALGORITHM}
+      SSO_JWT_SECRET: ${SSO_JWT_SECRET}
+      SSO_JWT_PUBLIC_KEY: ${SSO_JWT_PUBLIC_KEY}
+      SSO_AUDIENCE: ${SSO_AUDIENCE}
+      SSO_LEEWAY_SECONDS: ${SSO_LEEWAY_SECONDS}
+      TIREK_API_URL: ${TIREK_API_URL}
+      TIREK_PARTNER_KEY: ${TIREK_PARTNER_KEY}
+      TIREK_CABINET_URL: ${TIREK_CABINET_URL}
+      PLATFORM_API_KEY: ${PLATFORM_API_KEY}
+      PLAN_MAP: ${PLAN_MAP}
+    volumes:
+      - gateway-data:/data
+
+volumes:
+  gateway-data:
