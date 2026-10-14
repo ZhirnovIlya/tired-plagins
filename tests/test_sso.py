@@ -91,3 +91,17 @@ def test_rs256_with_platform_public_key(make_client, fake):
     assert client.get("/sso", params={"token": rs}).status_code == 303
     # HS256-токен при настройке RS256 не принимается (подмена алгоритма)
     assert client.get("/sso", params={"token": token()}).status_code == 401
+
+
+def test_key_not_matching_algorithm_gives_401_not_500(make_client, fake):
+    """HS256 с открытым ключом PEM вместо секрета: PyJWT бросает InvalidKeyError."""
+    pem = (
+        rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        .public_key()
+        .public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+        .decode()
+    )
+    client = make_client(sso_jwt_secret=pem)
+    r = client.get("/sso", params={"token": token()})
+    assert r.status_code == 401
+    assert fake.paths() == []

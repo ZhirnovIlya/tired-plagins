@@ -108,6 +108,9 @@ def create_app(
         except (ValueError, KeyError, TypeError):
             log.warning("вебхук отклонён: тело не по схеме")
             return JSONResponse({"detail": "invalid payload"}, 400)
+        # ponytail: seen() и record() не атомарны — два одинаковых вебхука, пришедших разом,
+        # оба дойдут до TIREK. Терпимо: вызовы TIREK идемпотентны по контракту. Если станет мало —
+        # занимать событие в БД до вызова TIREK (INSERT со статусом «в работе»), при сбое снимать.
         if store.seen(ev.event_id):
             log.info("событие %s уже обработано — повтор пропущен", ev.event_id)
             return {"status": "duplicate"}
@@ -139,7 +142,7 @@ def create_app(
                 options={"require": ["exp", "iat", "aud"]},
             )
             account_id, user_id = adapter.sso_ids(claims)
-        except (jwt.InvalidTokenError, KeyError, TypeError, ValueError) as e:
+        except (jwt.PyJWTError, KeyError, TypeError, ValueError) as e:
             log.warning("единый вход отклонён: %s", type(e).__name__)
             return page(401)
         try:
