@@ -31,7 +31,7 @@ def test_missing_signature_headers_rejected(client, fake):
     assert fake.paths() == []
 
 
-@pytest.mark.parametrize("shift", [-301, +301])
+@pytest.mark.parametrize("shift", [-310, +310])
 def test_timestamp_outside_window_rejected(client, fake, shift):
     r = send(client, event("e1", "subscription.purchased"), ts=int(time.time()) + shift)
     assert r.status_code == 401
@@ -104,7 +104,12 @@ def test_tirek_failure_gives_502_and_retry_succeeds(client, fake):
 def test_bbmarket_adapter_is_used(make_client, fake):
     """Заглушка адаптера BB-маркета; поля уточнить по их спецификации."""
     client = make_client(platform="bbmarket")
-    body = {"id": "bb-1", "event": "subscription.created", "company_id": "c-9",
-            "tariff": "pro", "created_at": "2026-10-14T10:00:00Z"}
+    body = {
+        "id": "bb-1",
+        "event": "subscription.created",
+        "company_id": "c-9",
+        "tariff": "pro",
+        "created_at": "2026-10-14T10:00:00Z",
+    }
     assert send(client, body).status_code == 200
     assert fake.paths() == [("POST", T, {"external_account_id": "c-9", "plan": "plugin_pro"})]

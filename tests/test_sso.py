@@ -81,10 +81,13 @@ def test_tirek_down_gives_502_page(client, fake):
 
 def test_rs256_with_platform_public_key(make_client, fake):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    pem = key.public_key().public_bytes(
-        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
-    ).decode()
+    pem = (
+        key.public_key()
+        .public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo)
+        .decode()
+    )
     client = make_client(sso_jwt_algorithm="RS256", sso_jwt_secret=None, sso_jwt_public_key=pem)
-    assert client.get("/sso", params={"token": token(secret=key, algorithm="RS256")}).status_code == 303
+    rs = token(secret=key, algorithm="RS256")
+    assert client.get("/sso", params={"token": rs}).status_code == 303
     # HS256-токен при настройке RS256 не принимается (подмена алгоритма)
     assert client.get("/sso", params={"token": token()}).status_code == 401

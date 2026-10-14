@@ -41,8 +41,21 @@ def test_logs_contain_no_secrets_and_no_personal_data(client, fake, caplog):
     client.get("/usage", params=PERIOD, headers={"Authorization": f"Bearer {PLATFORM_KEY}"})
     client.get("/usage", params=PERIOD, headers={"Authorization": "Bearer guess"})
 
-    assert caplog.records, "шлюз должен что-то логировать, иначе тест ничего не проверяет"
-    text = "\n".join(r.getMessage() for r in caplog.records)
-    for secret in (WEBHOOK_SECRET, JWT_SECRET, PARTNER_KEY, PLATFORM_KEY, good, expired,
-                   "user-7", "code-1", "guess", "forged"):
+    # Строки «HTTP Request: … http://testserver/…» пишет тестовый клиент (сторона площадки),
+    # не шлюз. В бою их аналог — журнал доступа uvicorn, он выключен (--no-access-log).
+    own = [r.getMessage() for r in caplog.records if "http://testserver/" not in r.getMessage()]
+    assert any("tirek.test" in m for m in own) and any(r.name == "gateway" for r in caplog.records)
+    text = "\n".join(own)
+    for secret in (
+        WEBHOOK_SECRET,
+        JWT_SECRET,
+        PARTNER_KEY,
+        PLATFORM_KEY,
+        good,
+        expired,
+        "user-7",
+        "code-1",
+        "guess",
+        "forged",
+    ):
         assert secret not in text, f"в логе найдено: {secret!r}"

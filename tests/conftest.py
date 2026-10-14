@@ -146,8 +146,13 @@ def send(client, body, **kw):
 
 def token(secret=JWT_SECRET, algorithm="HS256", **claims) -> str:
     now = int(time.time())
-    payload = {"account_id": "acc-1", "sub": "user-7", "aud": AUDIENCE, "iat": now,
-               "exp": now + 120}
+    payload = {
+        "account_id": "acc-1",
+        "sub": "user-7",
+        "aud": AUDIENCE,
+        "iat": now,
+        "exp": now + 120,
+    }
     payload.update(claims)
     payload = {k: v for k, v in payload.items() if v is not None}
     return jwt.encode(payload, secret, algorithm=algorithm)
