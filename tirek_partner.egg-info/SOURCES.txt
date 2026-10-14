@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+gateway/__init__.py
+gateway/adapters/__init__.py
+tirek_partner.egg-info/PKG-INFO
+tirek_partner.egg-info/SOURCES.txt
+tirek_partner.egg-info/dependency_links.txt
+tirek_partner.egg-info/requires.txt
+tirek_partner.egg-info/top_level.txt
