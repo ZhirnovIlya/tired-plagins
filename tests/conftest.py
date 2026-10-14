@@ -58,6 +58,7 @@ class FakeTirek:
         self.new_status = "active"  # статус, с которым POST создаёт нового арендатора
         self.down = False
         self.codes = 0
+        self.ids: dict[str, str] = {}  # external_account_id -> tenant_id
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         if request.headers.get("authorization") != f"Bearer {PARTNER_KEY}":
@@ -71,10 +72,10 @@ class FakeTirek:
         if request.method == "POST" and path == "/v1/partner/tenants":
             if _bad_external(body.get("external_account_id")):
                 return _error(422, "validation")
-            for tid, t in self.tenants.items():
-                if t["account"] == body["external_account_id"]:  # тариф повтором не меняется
-                    return httpx.Response(200, json={"tenant_id": tid, **_public(t)})
-            tid = f"t-{len(self.tenants) + 1}"
+            # tenant_id детерминирован по номеру, как в TIREK: после удаления — тот же
+            tid = self.ids.setdefault(body["external_account_id"], f"t-{len(self.ids) + 1}")
+            if tid in self.tenants:  # тариф повтором не меняется
+                return httpx.Response(200, json={"tenant_id": tid, **_public(self.tenants[tid])})
             self.tenants[tid] = {
                 "account": body["external_account_id"],
                 "plan": body["plan"],

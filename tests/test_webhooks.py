@@ -127,3 +127,30 @@ def test_repurchase_with_other_tariff_patches_plan(client, fake):
         ("POST", T, {"external_account_id": ext("acc-1"), "plan": "plugin_pro"}),
         ("PATCH", f"{T}/t-1", {"plan": "plugin_pro", "status": "active"}),
     ]
+
+
+def test_freeze_of_deleted_tenant_is_gone_not_502(client, fake):
+    """Арендатор удалён в TIREK (срок хранения): заморозить нечего — цель достигнута."""
+    _purchased(client, fake)
+    del fake.tenants["t-1"]
+    r = send(client, event("e1", "subscription.cancelled"))
+    assert r.status_code == 200 and r.json() == {"status": "gone"}
+    assert fake.paths() == [("PATCH", f"{T}/t-1", {"status": "frozen"})]
+    assert send(client, event("e1", "subscription.cancelled")).json() == {"status": "duplicate"}
+
+
+def test_plan_change_of_deleted_tenant_recreates_it(client, fake):
+    _purchased(client, fake)
+    del fake.tenants["t-1"]
+    r = send(client, event("e1", "subscription.plan_changed", plan="pro"))
+    assert r.status_code == 200 and r.json() == {"status": "processed"}
+    assert fake.paths() == [
+        ("PATCH", f"{T}/t-1", {"plan": "plugin_pro"}),
+        ("POST", T, {"external_account_id": ext("acc-1"), "plan": "plugin"}),
+        ("PATCH", f"{T}/t-1", {"plan": "plugin_pro"}),
+    ]
+    assert fake.tenants["t-1"] == {
+        "account": ext("acc-1"),
+        "plan": "plugin_pro",
+        "status": "active",
+    }

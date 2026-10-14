@@ -23,7 +23,7 @@ from gateway.adapters import bbmarket, neutral
 from gateway.adapters.neutral import Event, EventType
 from gateway.config import Settings
 from gateway.store import Store
-from gateway.tirek import PLUGIN, Tirek
+from gateway.tirek import PLUGIN, TenantGone, Tirek
 
 log = logging.getLogger("gateway")
 
@@ -98,7 +98,15 @@ def create_app(
                 changes = {"status": "frozen"}
             if tenant_id is None:  # вебхук покупки потерялся или ещё не пришёл
                 tenant_id = (await tirek.ensure_tenant(ev.account_id, PLUGIN))["tenant_id"]
-            await tirek.patch_tenant(tenant_id, **changes)
+            try:
+                await tirek.patch_tenant(tenant_id, **changes)
+            except TenantGone:  # арендатор удалён в TIREK
+                if "status" in changes:  # заморозить нечего — цель достигнута
+                    store.save_account(ev.account_id, tenant_id, ev.occurred_at)
+                    return "gone"
+                # смена тарифа: создать заново (tenant_id детерминирован) и повторить
+                tenant_id = (await tirek.ensure_tenant(ev.account_id, PLUGIN))["tenant_id"]
+                await tirek.patch_tenant(tenant_id, **changes)
         store.save_account(ev.account_id, tenant_id, ev.occurred_at)
         return "processed"
 

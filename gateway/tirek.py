@@ -27,6 +27,10 @@ def external_id(platform: str, raw: str) -> str:
     return hashlib.sha256(f"{platform}:{raw}".encode()).hexdigest()[:32]
 
 
+class TenantGone(Exception):
+    """Арендатора в TIREK больше нет (удалён, например, по сроку хранения)."""
+
+
 def _error_code(r: httpx.Response) -> str | None:
     try:
         return r.json()["detail"]["code"]
@@ -56,7 +60,11 @@ class Tirek:
         return await self._json("POST", "/v1/partner/tenants", json=body)
 
     async def patch_tenant(self, tenant_id: str, **changes: str) -> dict:
-        return await self._json("PATCH", f"/v1/partner/tenants/{tenant_id}", json=changes)
+        r = await self.http.patch(f"/v1/partner/tenants/{tenant_id}", json=changes)
+        if r.status_code == 404 and _error_code(r) == "tenant/not-found":
+            raise TenantGone
+        r.raise_for_status()
+        return r.json()
 
     async def login_code(self, tenant_id: str, user_id: str) -> str | None:
         """Одноразовый код входа в кабинет; None — арендатор не активен или удалён."""
